@@ -23,12 +23,7 @@ int findMaxPath(int arr[N][M],int i,int j) {
     }
     return maxsum;
 }
-/*
-void print(int arr[N][M]){
-    for (int i=0; i < N; i++){
-        for (int j =0; j<)
-    }
-}*/
+
 int main() 
 { 
       
@@ -36,9 +31,9 @@ int main()
     /*= { { 10, 10, 2, 0, 20, 4 }, 
                     { 1, 0, 0, 30, 2, 5 }, 
                     { 0, 10, 4, 0, 2, 0 }, 
-                    { 1, 0, 2, 20, 0, 4 } }; 
+                    { 1, 0, 2, 20, 0, 4 } }; */
               
-    //print(mat);*/
+    
 
     a[0][0] = 500; 
     a[0][1] = 100; 
