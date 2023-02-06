@@ -1,98 +1,121 @@
 #include <iostream>
 using namespace std;
+typedef unsigned int uint;
 
-// Class representing a shared pointer
-template <typename T>
-
-class Shared_ptr
+template<class T>
+class my_shared_ptr
 {
 private:
-	// Reference counter
-	int m_counter = 0;
+	T * ptr = nullptr;
+	uint * refCount = nullptr;
 
-	// Shared pointer
-	T* m_ptr;
 public:
-	// Constructor
-	explicit Shared_ptr(T* ptr = nullptr)
+	my_shared_ptr() : ptr(nullptr), refCount(new uint(0)) // default constructor
 	{
-		m_ptr = ptr;
-		if (ptr)
+	}
+
+	my_shared_ptr(T * ptr) : ptr(ptr), refCount(new uint(1)) // constructor
+	{
+	}
+
+	/*** Copy Semantics ***/
+	my_shared_ptr(const my_shared_ptr & obj) // copy constructor
+	{
+		this->ptr = obj.ptr; // share the underlying pointer
+		this->refCount = obj.refCount;
+		if (nullptr != obj.ptr)
 		{
-			m_counter++;
+			(*this->refCount)++; // if the pointer is not null, increment the refCount
 		}
 	}
 
-	// Copy constructor
-	Shared_ptr(Shared_ptr<T>& sp)
+	my_shared_ptr& operator=(const my_shared_ptr & obj) // copy assignment
 	{
-		m_ptr = sp.m_ptr;
-		m_counter = sp.m_counter;
-		m_counter++;
-	}
-
-	// Reference count
-	unsigned int use_count()
-	{
-	return m_counter;
-	}
-
-	// Get the pointer
-	T* get()
-	{
-	return m_ptr;
-	}
-
-	// Overload * operator
-	T& operator*()
-	{
-	return *m_ptr;
-	}
-
-	// Overload -> operator
-	T* operator->()
-	{
-	return m_ptr;
-	}
-
-	// Destructor
-	~Shared_ptr()
-	{
-		m_counter--;
-		if (m_counter == 0)
+		__cleanup__(); // cleanup any existing data
+		
+		// Assign incoming object's data to this object
+		this->ptr = obj.ptr; // share the underlying pointer
+		this->refCount = obj.refCount;
+		if (nullptr != obj.ptr)
 		{
-			delete m_ptr;
+			(*this->refCount)++; // if the pointer is not null, increment the refCount
 		}
 	}
 
-	friend ostream& operator<<(ostream& os,
-							Shared_ptr<T>& sp)
+	/*** Move Semantics ***/
+	my_shared_ptr(my_shared_ptr && dyingObj) // move constructor
 	{
-		os << "Address pointed : " << sp.get() << endl;
-		os << sp.m_counter << endl;
-		return os;
+		this->ptr = dyingObj.ptr; // share the underlying pointer
+		this->refCount = dyingObj.refCount;
+
+		dyingObj.ptr = dyingObj.refCount = nullptr; // clean the dying object
+	}
+
+	my_shared_ptr& operator=(my_shared_ptr && dyingObj) // move assignment
+	{
+		__cleanup__(); // cleanup any existing data
+		
+		this->ptr = dyingObj.ptr; // share the underlying pointer
+		this->refCount = dyingObj.refCount;
+
+		dyingObj.ptr = dyingObj.refCount = nullptr; // clean the dying object
+	}
+
+	uint get_count() const
+	{
+		return *refCount; // *this->refCount
+	}
+
+	T* get() const
+	{
+		return this->ptr;
+	}
+
+	T* operator->() const
+	{
+		return this->ptr;
+	}
+
+	T& operator*() const
+	{
+		return this->ptr;
+	}
+
+	~my_shared_ptr() // destructor
+	{
+		__cleanup__();
+	}
+
+private:
+	void __cleanup__()
+	{
+		(*refCount)--;
+		if (*refCount == 0)
+		{
+			if (nullptr != ptr)
+				delete ptr;
+			delete refCount;
+		}
 	}
 };
 
-int main()
+
+class Box
 {
-	// ptr1 pointing to an integer.
-	Shared_ptr<int> ptr1(new int(151));
-	cout << "--- Shared pointers ptr1 ---\n";
-	*ptr1 = 100;
-	cout << " ptr1's value now: " << *ptr1 << endl;
-	cout << ptr1;
-
-	{
-
-		Shared_ptr<int> ptr2 = ptr1;
-		cout << "--- Shared pointers ptr1, ptr2 ---\n";
-		cout << ptr1;
-		cout << ptr2;
-	}
-	
-	cout << "--- Shared pointers ptr1 ---\n";
-	cout << ptr1;
-
-	return 0;
+public:
+    int length, width, height;
+    Box() : length(0), width(0), height(0)
+    {
+    }
+};int main()
+{
+    my_shared_ptr<Box> obj;
+    cout << obj.get_count() << endl; // prints 0    
+    my_shared_ptr<Box> box1(new Box());
+    cout << box1.get_count() << endl; // prints 1
+    my_shared_ptr<Box> box2(box1); // calls copy constructor
+    cout << box1.get_count() << endl; // prints 2
+    cout << box2.get_count() << endl; // also prints 2
+ 
+    return 0;
 }
