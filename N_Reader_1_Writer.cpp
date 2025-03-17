@@ -10,12 +10,16 @@ private:
     int reader_count_ = 0;
     bool writer_active_ = false;
 
+    // Mutex to control entry for readers, allowing writers to block new readers
+    std::mutex reader_entry_mutex_;
+    int waiting_writers_ = 0; // Track waiting writers for potential priority
+
 public:
     // Acquire read lock
     void acquireReadLock() {
+        std::unique_lock<std::mutex> reader_lock(reader_entry_mutex_); // Acquire reader entry lock
         std::unique_lock<std::mutex> lock(mutex_);
-        // Wait if a writer is active
-        reader_cv_.wait(lock, [this]{ return !writer_active_; });
+        reader_cv_.wait(lock, [this]{ return !writer_active_ && waiting_writers_ == 0; });
         reader_count_++;
     }
 
@@ -24,16 +28,17 @@ public:
         std::unique_lock<std::mutex> lock(mutex_);
         reader_count_--;
         if (reader_count_ == 0) {
-            // If no more readers, notify waiting writers
             writer_cv_.notify_one();
         }
     }
 
     // Acquire write lock
     void acquireWriteLock() {
+        std::unique_lock<std::mutex> writer_lock(reader_entry_mutex_); // Block new readers
         std::unique_lock<std::mutex> lock(mutex_);
-        // Wait if any readers are active or a writer is active
+        waiting_writers_++;
         writer_cv_.wait(lock, [this]{ return reader_count_ == 0 && !writer_active_; });
+        waiting_writers_--;
         writer_active_ = true;
     }
 
@@ -41,8 +46,7 @@ public:
     void releaseWriteLock() {
         std::unique_lock<std::mutex> lock(mutex_);
         writer_active_ = false;
-        // Notify waiting readers and writers (writers get priority in this simple implementation)
-        writer_cv_.notify_one();
+        writer_cv_.notify_one(); // Give priority to a waiting writer
         reader_cv_.notify_all();
     }
 };
@@ -83,28 +87,4 @@ void writer_function(int id) {
         std::cout << "Writer " << id << " acquired write lock. Writing data: " << new_data << std::endl;
         shared_data = new_data;
         std::this_thread::sleep_for(std::chrono::milliseconds(sleep_dist(gen)));
-        std::cout << "Writer " << id << " releasing write lock." << std::endl;
-        rw_lock.releaseWriteLock();
-        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_dist(gen)));
-    }
-}
-
-int main() {
-    std::vector<std::thread> threads;
-    int num_readers = 5;
-    int num_writers = 2;
-
-    for (int i = 0; i < num_readers; ++i) {
-        threads.emplace_back(reader_function, i + 1);
-    }
-
-    for (int i = 0; i < num_writers; ++i) {
-        threads.emplace_back(writer_function, i + 1);
-    }
-
-    for (auto& thread : threads) {
-        thread.join();
-    }
-
-    return 0;
-}
+        std::cout << "Writer " <
